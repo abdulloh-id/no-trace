@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using TL;
 using WTelegram;
-using NoTrace.Engine.Core;
+using NoTrace.Engine.Core; // UserCanceledException lives here
 
 namespace NoTrace.Engine.UI;
 
@@ -48,7 +48,14 @@ public class MenuController
                     await HandleBlocklistManagerAsync();
                     break;
                 case "3":
-                    await _cleanupService.PurgeUselessContactsAsync();
+                    try
+                    {
+                        await _cleanupService.PurgeUselessContactsAsync();
+                    }
+                    catch (UserCanceledException)
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.OperationCancelled));
+                    }
                     break;
                 case "4":
                     HandleSettingsMenu();
@@ -194,12 +201,51 @@ public class MenuController
             if (levelChoice == "1")
             {
                 targetLimit = PromptSurgicalDepth();
+                if (targetLimit == -1) // sentinel: user pressed [0] at depth menu
+                    continue;
+            }
+
+            // Confirmation gate for destructive levels
+            if (levelChoice == "2" || levelChoice == "3" || levelChoice == "4")
+            {
+                TextKey confirmKey = levelChoice switch
+                {
+                    "2" => TextKey.ConfirmLevel2,
+                    "3" => TextKey.ConfirmLevel3,
+                    _   => TextKey.ConfirmLevel4
+                };
+
+                if (levelChoice == "4")
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write(LocaleManager.T(confirmKey));
+                    Console.ResetColor();
+                }
+                else
+                {
+                    Console.Write(LocaleManager.T(confirmKey));
+                }
+
+                string confirm = Console.ReadLine()?.Trim().ToLower() ?? "";
+                if (confirm != "y")
+                {
+                    Console.WriteLine(LocaleManager.T(TextKey.OperationCancelled));
+                    continue;
+                }
             }
 
             Console.WriteLine(LocaleManager.T(TextKey.LaunchingWipe, levelChoice));
-            await _cleanupService.ExecuteChatWipeAsync(target, levelChoice, myMessageIds, targetLimit);
 
-            Console.WriteLine(LocaleManager.T(TextKey.OperationComplete));
+            try
+            {
+                await _cleanupService.ExecuteChatWipeAsync(target, levelChoice, myMessageIds, targetLimit);
+                Console.WriteLine(LocaleManager.T(TextKey.OperationComplete));
+            }
+            catch (UserCanceledException)
+            {
+                Console.WriteLine(LocaleManager.T(TextKey.OperationCancelled));
+            }
+
             await Task.Delay(1500);
         }
     }
@@ -223,9 +269,27 @@ public class MenuController
             return;
         }
 
-        await _cleanupService.PurgeBlocklistAsync(blockChoice);
+        Console.Write(LocaleManager.T(TextKey.ConfirmBlocklistPurge));
+        string confirm = Console.ReadLine()?.Trim().ToLower() ?? "";
+        if (confirm != "y")
+        {
+            Console.WriteLine(LocaleManager.T(TextKey.OperationCancelled));
+            return;
+        }
+
+        try
+        {
+            await _cleanupService.PurgeBlocklistAsync(blockChoice);
+        }
+        catch (UserCanceledException)
+        {
+            Console.WriteLine(LocaleManager.T(TextKey.OperationCancelled));
+        }
     }
 
+    /// <summary>
+    /// Returns the chosen depth limit, or -1 as a sentinel value when the user presses [0] to go back.
+    /// </summary>
     private int? PromptSurgicalDepth()
     {
         while (true)
@@ -236,21 +300,28 @@ public class MenuController
             Console.WriteLine(LocaleManager.T(TextKey.SurgicalDepthOpt3));
             Console.WriteLine(LocaleManager.T(TextKey.SurgicalDepthOpt4));
             Console.WriteLine(LocaleManager.T(TextKey.SurgicalDepthOpt5));
+            Console.WriteLine(LocaleManager.T(TextKey.SurgicalDepthOpt0));
             Console.Write($"\n{LocaleManager.T(TextKey.SurgicalDepthChoicePrompt)}");
 
             string choice = Console.ReadLine() ?? "";
 
             switch (choice)
             {
-                case "1": return 50;
-                case "2": return 100;
-                case "3": return 200;
+                case "0":
+                    return -1; // sentinel → caller will `continue` the outer loop
+                case "1":
+                    return 50;
+                case "2":
+                    return 100;
+                case "3":
+                    return 200;
                 case "4":
                     Console.Write($"\n{LocaleManager.T(TextKey.CustomDepthPrompt)}");
-                    if (int.TryParse(Console.ReadLine(), out int customVal) && customVal > 0)
-                    {
+                    string raw = Console.ReadLine() ?? "";
+                    if (raw == "0")
+                        return -1; // [0] at custom input → also go back
+                    if (int.TryParse(raw, out int customVal) && customVal > 0)
                         return customVal;
-                    }
                     Console.WriteLine(LocaleManager.T(TextKey.InvalidDepthInput));
                     return null;
                 case "5":

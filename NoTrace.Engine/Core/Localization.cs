@@ -54,6 +54,7 @@ public enum TextKey
     SurgicalDepthOpt3,
     SurgicalDepthOpt4,
     SurgicalDepthOpt5,
+    SurgicalDepthOpt0,
     SurgicalDepthChoicePrompt,
     CustomDepthPrompt,
     InvalidDepthInput,
@@ -103,6 +104,15 @@ public enum TextKey
     LogLinkedLeaveParticipantSkipped,
     LogMainLeaveSkipped,
     LogFootprintCleanupSkipped,
+
+    // Confirmations
+    ConfirmLevel2,
+    ConfirmLevel3,
+    ConfirmLevel4,
+    ConfirmBlocklistPurge,
+
+    // Cancellation
+    OperationCancelled,
 
     // Engine Boot/Shutdown Lifecycle Hooks
     EngineInitializing,
@@ -203,6 +213,7 @@ public static class LocaleManager
             [TextKey.SurgicalDepthOpt3] = "[3] Last 200 messages",
             [TextKey.SurgicalDepthOpt4] = "[4] Custom amount",
             [TextKey.SurgicalDepthOpt5] = "[5] All messages",
+            [TextKey.SurgicalDepthOpt0] = "[0] Back",
             [TextKey.SurgicalDepthChoicePrompt] = "Select depth limit: ",
             [TextKey.CustomDepthPrompt] = "Enter custom message limit (numeric): ",
             [TextKey.InvalidDepthInput] = "[Error] Invalid number provided. Defaulting to 'All'.",
@@ -251,6 +262,13 @@ public static class LocaleManager
             [TextKey.EngineInitializing] = "--- NoTrace Engine Initializing ---",
             [TextKey.LoginSuccess] = "\nSuccess! Logged in as: {0} (ID: {1})",
             [TextKey.EngineShutdown] = "Exiting engine. Goodbye.",
+
+            [TextKey.OperationCancelled] = "\n[Cancelled] Operation aborted. Returning to previous menu...",
+
+            [TextKey.ConfirmLevel2] = "\n[!] This will wipe all chat history. Proceed? (y/n): ",
+            [TextKey.ConfirmLevel3] = "\n[!] This will wipe history and block/leave. Proceed? (y/n): ",
+            [TextKey.ConfirmLevel4] = "\n[!!] NUCLEAR OPTION — This will wipe all traces and remove the contact permanently. Proceed? (y/n): ",
+            [TextKey.ConfirmBlocklistPurge] = "\n[!] This will unblock and delete history for all matching entries. Proceed? (y/n): ",
 
             [TextKey.LabelChoicePrompt] = "\nChoice: ",
             [TextKey.LabelTitleHeader] = " | Title: ",
@@ -303,6 +321,7 @@ public static class LocaleManager
             [TextKey.SurgicalDepthOpt3] = "[3] Oxirgi 200 ta xabar",
             [TextKey.SurgicalDepthOpt4] = "[4] Maxsus miqdor (Qo‘lda kiritish)",
             [TextKey.SurgicalDepthOpt5] = "[5] Barcha xabarlar (Hammasi)",
+            [TextKey.SurgicalDepthOpt0] = "[0] Orqaga",
             [TextKey.SurgicalDepthChoicePrompt] = "Tozalash chuqurligini tanlang: ",
             [TextKey.CustomDepthPrompt] = "Maxsus xabarlar sonini kiriting (raqam): ",
             [TextKey.InvalidDepthInput] = "[Xatolik] Noto‘g‘ri raqam kiritildi. 'Barchasi' rejimi tanlandi.",
@@ -351,6 +370,13 @@ public static class LocaleManager
             [TextKey.EngineInitializing] = "--- NoTrace Dvigateli Ishga Tushmoqda ---",
             [TextKey.LoginSuccess] = "\nMuvaffaqiyatli ulanish! Tizimga kirildi: {0} (ID: {1})",
             [TextKey.EngineShutdown] = "Dvigateldan chiqilmoqda. Xayr.",
+
+            [TextKey.OperationCancelled] = "\n[Bekor qilindi] Amal to'xtatildi. Oldingi menyuga qaytilmoqda...",
+
+            [TextKey.ConfirmLevel2] = "\n[!] Bu barcha suhbat tarixini o'chiradi. Davom etasizmi? (y/n): ",
+            [TextKey.ConfirmLevel3] = "\n[!] Bu tarixni o'chirib, bloklaydi/chiqadi. Davom etasizmi? (y/n): ",
+            [TextKey.ConfirmLevel4] = "\n[!!] YADROVIY VARIANT — Barcha izlar o'chiriladi va kontakt butunlay yo'q qilinadi. Davom etasizmi? (y/n): ",
+            [TextKey.ConfirmBlocklistPurge] = "\n[!] Bu mos yozuvlarning hammasini blokdan chiqarib, tarixini o'chiradi. Davom etasizmi? (y/n): ",
 
             [TextKey.LabelChoicePrompt] = "\nTanlov: ",
             [TextKey.LabelTitleHeader] = " | Nomi: ",
@@ -403,6 +429,7 @@ public static class LocaleManager
             [TextKey.SurgicalDepthOpt3] = "[3] Последние 200 сообщений",
             [TextKey.SurgicalDepthOpt4] = "[4] Указать свое количество",
             [TextKey.SurgicalDepthOpt5] = "[5] Все сообщения",
+            [TextKey.SurgicalDepthOpt0] = "[0] Назад",
             [TextKey.SurgicalDepthChoicePrompt] = "Выберите лимит глубины: ",
             [TextKey.CustomDepthPrompt] = "Введите точное количество сообщений (число): ",
             [TextKey.InvalidDepthInput] = "[Ошибка] Введено неверное число. Выбран режим 'Все'.",
@@ -451,6 +478,13 @@ public static class LocaleManager
             [TextKey.EngineInitializing] = "--- Инициализация Движка NoTrace Engine ---",
             [TextKey.LoginSuccess] = "\nАвторизация успешна! Вход выполнен как: {0} (ID: {1})",
             [TextKey.EngineShutdown] = "Завершение работы движка. До свидания.",
+
+            [TextKey.OperationCancelled] = "\n[Отменено] Операция прервана. Возврат в предыдущее меню...",
+
+            [TextKey.ConfirmLevel2] = "\n[!] Это сотрёт всю историю чата. Продолжить? (y/n): ",
+            [TextKey.ConfirmLevel3] = "\n[!] Это сотрёт историю и заблокирует/выйдет. Продолжить? (y/n): ",
+            [TextKey.ConfirmLevel4] = "\n[!!] ЯДЕРНЫЙ ВАРИАНТ — Все следы будут уничтожены, контакт удалён навсегда. Продолжить? (y/n): ",
+            [TextKey.ConfirmBlocklistPurge] = "\n[!] Это разблокирует все совпадающие записи и удалит их историю. Продолжить? (y/n): ",
 
             [TextKey.LabelChoicePrompt] = "\nВаш выбор: ",
             [TextKey.LabelTitleHeader] = " | Название: ",
