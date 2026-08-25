@@ -3,6 +3,7 @@
 [Oo]bj/
 *.deps.json
 *.runtimeconfig.json
+*.json
 
 # Sensitive personal data protection
 .env
