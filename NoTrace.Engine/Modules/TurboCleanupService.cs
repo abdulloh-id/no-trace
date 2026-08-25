@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using TL;
 using NoTrace.Engine.Core; // UserCanceledException + ICleanupService live here
 
-namespace NoTrace.Pro.Engine.Modules;
+namespace NoTrace.Engine.Modules;
 
 // Explicitly inherit from the public interface contract
 public class TurboCleanupService : ICleanupService
