@@ -223,7 +223,9 @@ public class MenuController
                 }
                 else
                 {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.Write(LocaleManager.T(confirmKey));
+                    Console.ResetColor();
                 }
 
                 string confirm = Console.ReadLine()?.Trim().ToLower() ?? "";
@@ -271,7 +273,9 @@ public class MenuController
             return;
         }
 
+        Console.ForegroundColor = ConsoleColor.Yellow;
         Console.Write(LocaleManager.T(TextKey.ConfirmBlocklistPurge));
+        Console.ResetColor();
         string confirm = Console.ReadLine()?.Trim().ToLower() ?? "";
         if (confirm != "y")
         {
