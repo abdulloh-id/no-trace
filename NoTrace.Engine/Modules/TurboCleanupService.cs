@@ -33,6 +33,16 @@ public class TurboCleanupService : ICleanupService
     }
 
     /// <summary>
+    /// Writes a success message in green, then resets the console color.
+    /// </summary>
+    private static void WriteSuccess(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine(message);
+        Console.ResetColor();
+    }
+
+    /// <summary>
     /// Deletes only the user's personal messages from a given target chat thread.
     /// Automatically routes between standard chats and supergroups/channels.
     /// </summary>
@@ -149,7 +159,7 @@ public class TurboCleanupService : ICleanupService
                                 {
                                     // WTelegram uses Channels_DeleteMessages for channels/supergroups
                                     await _client.Channels_DeleteMessages(linkedChannelObj, linkedTargetedIds);
-                                    Console.WriteLine($"[SUCCESS] Deleted {linkedTargetedIds.Length} messages from linked group '{linkedChat.Title}'.");
+                                    WriteSuccess($"[SUCCESS] Deleted {linkedTargetedIds.Length} messages from linked group '{linkedChat.Title}'.");
                                 }
                                 else
                                 {
@@ -254,13 +264,21 @@ public class TurboCleanupService : ICleanupService
                 else // Level 4 logic for 1:1 Chats (Users/Bots)
                 {
                     Console.WriteLine(LocaleManager.T(TextKey.LogExecutingForensic));
-                    await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: false, revoke: true);
 
-                    if (target is User u)
+                    try
                     {
-                        await _client.Contacts_DeleteContacts(new InputUserBase[] { u });
-                        Console.WriteLine(LocaleManager.T(TextKey.LogForensicWipeSuccess));
+                        await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: false, revoke: true);
                     }
+                    finally
+                    {
+                        if (target is User u)
+                        {
+                            await _client.Contacts_Block(u);
+                            await _client.Contacts_DeleteContacts(new InputUserBase[] { u });
+                        }
+                    }
+
+                    WriteSuccess(LocaleManager.T(TextKey.LogForensicWipeSuccess));
                 }
                 break;
         }
@@ -302,6 +320,15 @@ public class TurboCleanupService : ICleanupService
             if (shouldUnblock)
             {
                 string name = u.username ?? u.first_name ?? "Unknown";
+
+                // Warn before unblocking bots specifically, since that restores their ability to message again
+                if (u.IsBot)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine(LocaleManager.T(TextKey.UnblockBotWarning, name));
+                    Console.ResetColor();
+                }
+
                 int retryCount = 0;
 
                 batchCounter++;
@@ -355,7 +382,7 @@ public class TurboCleanupService : ICleanupService
                 }
             }
         }
-        Console.WriteLine(LocaleManager.T(TextKey.EntitiesProcessedSuccess, count));
+        WriteSuccess(LocaleManager.T(TextKey.EntitiesProcessedSuccess, count));
     }
 
     /// <summary>
@@ -405,7 +432,7 @@ public class TurboCleanupService : ICleanupService
                 Console.WriteLine(LocaleManager.T(TextKey.PurgeProgress, contactPurgeCount, toDelete.Count));
                 await Task.Delay(2000);
             }
-            Console.WriteLine(LocaleManager.T(TextKey.ContactPurgeSuccess));
+            WriteSuccess(LocaleManager.T(TextKey.ContactPurgeSuccess));
         }
     }
 }

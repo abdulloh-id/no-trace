@@ -239,7 +239,9 @@ public class MenuController
             try
             {
                 await _cleanupService.ExecuteChatWipeAsync(target, levelChoice, myMessageIds, targetLimit);
+                Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine(LocaleManager.T(TextKey.OperationComplete));
+                Console.ResetColor();
             }
             catch (UserCanceledException)
             {
