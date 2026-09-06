@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 
-namespace NoTrace.Pro.Engine;
+namespace NoTrace.Engine.Configuration;
 
 public class AppSettings
 {
@@ -11,6 +11,12 @@ public class AppSettings
     public string LicenseKey { get; set; } = "";
     public string LastHWID { get; set; } = "";
     public bool IsPremium { get; set; } = false;
+
+    // Credential source override: false = use embedded/release credentials
+    // (or .env fallback for self-builds), true = use the custom values below.
+    public bool UseOwnApiCredentials { get; set; } = false;
+    public string CustomApiId { get; set; } = "";
+    public string CustomApiHash { get; set; } = "";
 }
 
 public class UserProfile

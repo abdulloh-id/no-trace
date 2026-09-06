@@ -1,7 +1,5 @@
-﻿using System;
-using System.IO;
+using System;
 using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 using WTelegram;
 using NoTrace.Engine.Configuration; // Public core configuration
@@ -24,73 +22,88 @@ try
 
     Console.WriteLine(LocaleManager.T(TextKey.EngineInitializing));
 
-    // Dynamic config selection helper
-    Func<string, string?> configProvider = EnvManager.ConfigProvider; // Default to public .env
-    string jsonPath = Path.Combine(AppContext.BaseDirectory, "profiles.json");
-
-    if (File.Exists(jsonPath))
+    // Restore saved language preference, if any.
+    var appSettings = SessionConfig.LoadSettings();
+    if (Enum.TryParse<Language>(appSettings.Language, out var savedLanguage))
     {
-        Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("\n--- NoTrace Pro Profile Manager ---");
-        Console.ResetColor();
+        LocaleManager.CurrentLanguage = savedLanguage;
+    }
 
-        using var jsonDoc = JsonDocument.Parse(File.ReadAllText(jsonPath));
-        var profilesElement = jsonDoc.RootElement.GetProperty("Profiles");
-        
-        var profileList = new System.Collections.Generic.List<(string Name, string ApiId, string ApiHash, string Phone, string Session)>();
-        foreach (var property in profilesElement.EnumerateObject())
+    // Outer loop: lets Profile Management > Switch/Add tear down the current
+    // Client and restart the login flow in-process, without relaunching the exe.
+    bool keepRunning = true;
+    bool forcePicker = false; // true only when re-entering because the user asked to switch/add a profile
+
+    while (keepRunning)
+    {
+        appSettings = SessionConfig.LoadSettings(); // re-read in case credentials changed mid-session
+        var profiles = SessionConfig.LoadProfiles();
+
+        UserProfile? selectedProfile = null;
+        bool isNewProfile;
+
+        if (profiles.Count == 0)
         {
-            profileList.Add((
-                property.Name,
-                property.Value.GetProperty("API_ID").GetString() ?? "",
-                property.Value.GetProperty("API_HASH").GetString() ?? "",
-                property.Value.GetProperty("PHONE_NUMBER").GetString() ?? "",
-                property.Value.GetProperty("SESSION_NAME").GetString() ?? property.Name
-            ));
+            // First run: nothing saved yet, go straight into a fresh login.
+            Console.WriteLine(LocaleManager.T(TextKey.FirstRunWelcome));
+            isNewProfile = true;
         }
-
-        // Display selection menu
-        for (int i = 0; i < profileList.Count; i++)
+        else if (profiles.Count == 1 && !forcePicker)
         {
-            Console.WriteLine($" [{i + 1}] {profileList[i].Name} ({profileList[i].Phone})");
-        }
-        Console.WriteLine($" [{profileList.Count + 1}] Fallback to default public .env file");
-
-        Console.Write("\nSelect active runtime profile index: ");
-        if (int.TryParse(Console.ReadLine(), out int choice) && choice > 0 && choice <= profileList.Count)
-        {
-            var selected = profileList[choice - 1];
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"\n[Pro] Loading active identity profile: {selected.Name.ToUpper()}");
-            Console.ResetColor();
-
-            // Override WTelegram config completely with JSON profile properties
-            configProvider = configKey => configKey switch
-            {
-                "api_id" => selected.ApiId,
-                "api_hash" => selected.ApiHash,
-                "phone_number" => selected.Phone,
-                "session_pathname" => Path.Combine(AppContext.BaseDirectory, $"{selected.Session}.session"),
-                _ => null
-            };
+            // Normal startup with exactly one saved profile: skip the picker.
+            // But if the user got here via "switch/add profile", always show the
+            // picker so "Add new account" is reachable even with just one entry.
+            selectedProfile = profiles[0];
+            isNewProfile = false;
         }
         else
         {
-            Console.WriteLine("\n[Note] Standard environment fallback engine selected.");
+            selectedProfile = MenuController.PromptProfilePicker(profiles);
+            isNewProfile = selectedProfile == null;
         }
+
+        forcePicker = false; // reset; only re-armed below if the user switches again
+
+        string sessionName = selectedProfile?.SessionName ?? $"session_{Guid.NewGuid():N}";
+
+        Func<string, string?> configProvider = configKey => configKey switch
+        {
+            "api_id" => ResolveApiId(appSettings),
+            "api_hash" => ResolveApiHash(appSettings),
+            "phone_number" => selectedProfile?.PhoneNumber ?? PromptPhoneNumber(),
+            "session_pathname" => SessionConfig.GetSessionPath(sessionName),
+            "verification_code" => PromptVerificationCode(),
+            "password" => PromptPassword(), // used transiently only, never persisted
+            _ => null
+        };
+
+        using var client = new Client(configProvider);
+        var user = await client.LoginUserIfNeeded();
+
+        Console.WriteLine(LocaleManager.T(TextKey.LoginSuccess, user.first_name, user.id));
+
+        if (isNewProfile)
+        {
+            var newProfile = new UserProfile
+            {
+                PhoneNumber = user.phone ?? selectedProfile?.PhoneNumber ?? "",
+                DisplayName = $"{user.first_name} {user.last_name}".Trim(),
+                Username = user.username ?? "",
+                SessionName = sessionName
+            };
+
+            profiles.Add(newProfile);
+            SessionConfig.SaveProfiles(profiles);
+        }
+
+        // Pass private premium service contract into the public menu orchestrator
+        ICleanupService proCleanupService = new TurboCleanupService(client);
+        var menuController = new MenuController(client, proCleanupService);
+
+        bool switchProfileRequested = await menuController.StartEngineAsync();
+        keepRunning = switchProfileRequested;
+        forcePicker = switchProfileRequested;
     }
-
-    // Initialize WTelegram client using selected provider rules
-    using var client = new Client(configProvider);
-    var user = await client.LoginUserIfNeeded();
-    
-    Console.WriteLine(LocaleManager.T(TextKey.LoginSuccess, user.first_name, user.id));
-
-    // Pass private premium service contract into the public menu orchestrator
-    ICleanupService proCleanupService = new TurboCleanupService(client);
-    var menuController = new MenuController(client, proCleanupService);
-
-    await menuController.StartEngineAsync();
 }
 catch (Exception ex)
 {
@@ -101,4 +114,46 @@ catch (Exception ex)
 finally
 {
     Console.WriteLine(LocaleManager.T(TextKey.EngineShutdown));
+}
+
+static string ResolveApiId(AppSettings settings)
+{
+    if (settings.UseOwnApiCredentials)
+        return settings.CustomApiId;
+
+    if (EmbeddedCredentials.IsAvailable)
+        return EmbeddedCredentials.ApiId;
+
+    // Self-built/cloned binary with no embedded credentials and no custom
+    // override set yet — fall back to the .env flow for backward compatibility.
+    return EnvManager.ConfigProvider("api_id") ?? "";
+}
+
+static string ResolveApiHash(AppSettings settings)
+{
+    if (settings.UseOwnApiCredentials)
+        return settings.CustomApiHash;
+
+    if (EmbeddedCredentials.IsAvailable)
+        return EmbeddedCredentials.ApiHash;
+
+    return EnvManager.ConfigProvider("api_hash") ?? "";
+}
+
+static string PromptPhoneNumber()
+{
+    Console.Write(LocaleManager.T(TextKey.PhoneNumberPrompt));
+    return Console.ReadLine() ?? "";
+}
+
+static string PromptVerificationCode()
+{
+    Console.Write("Enter verification challenge code: ");
+    return Console.ReadLine() ?? "";
+}
+
+static string PromptPassword()
+{
+    Console.Write("Enter secondary account security token (2FA): ");
+    return Console.ReadLine() ?? "";
 }

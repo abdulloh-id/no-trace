@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using TL;
 using WTelegram;
 using NoTrace.Engine.Core; // UserCanceledException lives here
+using NoTrace.Engine.Configuration; // SessionConfig, AppSettings, UserProfile, EmbeddedCredentials
 
 namespace NoTrace.Engine.UI;
 
@@ -22,7 +23,12 @@ public class MenuController
         _cleanupService = cleanupService;
     }
 
-    public async Task StartEngineAsync()
+    /// <summary>
+    /// Runs the main menu loop. Returns true if the user requested a profile switch
+    /// from Profile Management (caller should tear down the Client and restart the
+    /// login flow), or false on a normal exit via [0] at the main menu.
+    /// </summary>
+    public async Task<bool> StartEngineAsync()
     {
         while (true)
         {
@@ -31,13 +37,14 @@ public class MenuController
             Console.WriteLine(LocaleManager.T(TextKey.MenuOption2));
             Console.WriteLine(LocaleManager.T(TextKey.MenuOption3));
             Console.WriteLine(LocaleManager.T(TextKey.MenuOption4));
+            Console.WriteLine(LocaleManager.T(TextKey.MenuOption5));
             Console.WriteLine(LocaleManager.T(TextKey.MenuOption0));
             Console.Write($"\n{LocaleManager.T(TextKey.SelectAction)}");
 
             string mainMenuChoice = Console.ReadLine() ?? "";
 
             if (mainMenuChoice == "0")
-                break;
+                return false;
 
             switch (mainMenuChoice)
             {
@@ -58,6 +65,10 @@ public class MenuController
                     }
                     break;
                 case "4":
+                    if (HandleManageProfilesMenu())
+                        return true; // caller tears down Client and restarts login flow
+                    break;
+                case "5":
                     HandleSettingsMenu();
                     break;
                 default:
@@ -72,31 +83,271 @@ public class MenuController
         while (true)
         {
             Console.WriteLine($"\n{LocaleManager.T(TextKey.SettingsMenuTitle)}");
-            Console.WriteLine(LocaleManager.T(TextKey.SelectLanguageOption));
+            Console.WriteLine(LocaleManager.T(TextKey.SettingsOptLanguage));
+            Console.WriteLine(LocaleManager.T(TextKey.SettingsOptApiCredentials));
+            Console.WriteLine(LocaleManager.T(TextKey.MenuOptBackToMain));
             Console.Write("\nChoice: ");
 
             string choice = Console.ReadLine() ?? "";
             if (choice == "0")
-                break;
+                return;
 
             switch (choice)
             {
                 case "1":
-                    LocaleManager.CurrentLanguage = Language.UZ;
-                    Console.WriteLine($"\n[SUCCESS] {LocaleManager.T(TextKey.LanguageChanged)}");
-                    return;
+                    HandleLanguageMenu();
+                    break;
                 case "2":
-                    LocaleManager.CurrentLanguage = Language.EN;
-                    Console.WriteLine($"\n[SUCCESS] {LocaleManager.T(TextKey.LanguageChanged)}");
-                    return;
-                case "3":
-                    LocaleManager.CurrentLanguage = Language.RU;
-                    Console.WriteLine($"\n[SUCCESS] {LocaleManager.T(TextKey.LanguageChanged)}");
-                    return;
+                    HandleApiCredentialsMenu();
+                    break;
                 default:
                     Console.WriteLine(LocaleManager.T(TextKey.InvalidSelection));
                     break;
             }
+        }
+    }
+
+    private void HandleLanguageMenu()
+    {
+        Console.WriteLine(LocaleManager.T(TextKey.LanguageMenuTitle));
+        Console.WriteLine(LocaleManager.T(TextKey.SelectLanguageOption));
+        Console.Write("\nChoice: ");
+
+        string choice = Console.ReadLine() ?? "";
+
+        switch (choice)
+        {
+            case "1":
+                LocaleManager.CurrentLanguage = Language.UZ;
+                PersistLanguage(Language.UZ);
+                Console.WriteLine($"\n[SUCCESS] {LocaleManager.T(TextKey.LanguageChanged)}");
+                break;
+            case "2":
+                LocaleManager.CurrentLanguage = Language.EN;
+                PersistLanguage(Language.EN);
+                Console.WriteLine($"\n[SUCCESS] {LocaleManager.T(TextKey.LanguageChanged)}");
+                break;
+            case "3":
+                LocaleManager.CurrentLanguage = Language.RU;
+                PersistLanguage(Language.RU);
+                Console.WriteLine($"\n[SUCCESS] {LocaleManager.T(TextKey.LanguageChanged)}");
+                break;
+            case "0":
+                break;
+            default:
+                Console.WriteLine(LocaleManager.T(TextKey.InvalidSelection));
+                break;
+        }
+    }
+
+    private static void PersistLanguage(Language lang)
+    {
+        var settings = SessionConfig.LoadSettings();
+        settings.Language = lang.ToString();
+        SessionConfig.SaveSettings(settings);
+    }
+
+    private void HandleApiCredentialsMenu()
+    {
+        while (true)
+        {
+            var settings = SessionConfig.LoadSettings();
+
+            Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsMenuTitle));
+            Console.WriteLine(settings.UseOwnApiCredentials
+                ? LocaleManager.T(TextKey.ApiCredentialsCurrentCustom)
+                : LocaleManager.T(TextKey.ApiCredentialsCurrentEmbedded));
+
+            if (!settings.UseOwnApiCredentials && !EmbeddedCredentials.IsAvailable)
+                Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsEmbeddedUnavailable));
+
+            Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsOptUseOwn));
+            Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsOptGetOwn));
+            Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsOptRevertToEmbedded));
+            Console.WriteLine(LocaleManager.T(TextKey.MenuOptBack));
+            Console.Write(LocaleManager.T(TextKey.ApiCredentialsChoicePrompt));
+
+            string choice = Console.ReadLine()?.Trim() ?? "";
+
+            switch (choice)
+            {
+                case "0":
+                    return;
+                case "1":
+                    Console.Write(LocaleManager.T(TextKey.ApiCredentialsPromptApiId));
+                    string apiId = Console.ReadLine()?.Trim() ?? "";
+                    Console.Write(LocaleManager.T(TextKey.ApiCredentialsPromptApiHash));
+                    string apiHash = Console.ReadLine()?.Trim() ?? "";
+
+                    if (string.IsNullOrWhiteSpace(apiId) || string.IsNullOrWhiteSpace(apiHash))
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.InvalidSelection));
+                        break;
+                    }
+
+                    settings.UseOwnApiCredentials = true;
+                    settings.CustomApiId = apiId;
+                    settings.CustomApiHash = apiHash;
+                    SessionConfig.SaveSettings(settings);
+
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsSaved));
+                    Console.ResetColor();
+                    break;
+                case "2":
+                    Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsInstructions));
+                    break;
+                case "3":
+                    settings.UseOwnApiCredentials = false;
+                    SessionConfig.SaveSettings(settings);
+
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine(LocaleManager.T(TextKey.ApiCredentialsReverted));
+                    Console.ResetColor();
+                    break;
+                default:
+                    Console.WriteLine(LocaleManager.T(TextKey.InvalidSelection));
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns true if the user chose to switch/add a profile (caller should tear
+    /// down the current Client and restart the login flow), false otherwise.
+    /// </summary>
+    private bool HandleManageProfilesMenu()
+    {
+        while (true)
+        {
+            var profiles = SessionConfig.LoadProfiles();
+
+            Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesMenuTitle));
+
+            if (profiles.Count == 0)
+            {
+                Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesNoProfiles));
+            }
+            else
+            {
+                for (int i = 0; i < profiles.Count; i++)
+                {
+                    string label = string.IsNullOrWhiteSpace(profiles[i].DisplayName)
+                        ? profiles[i].PhoneNumber
+                        : profiles[i].DisplayName;
+                    Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesEntry, i + 1, label, profiles[i].PhoneNumber));
+                }
+            }
+
+            Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesOptRemove));
+            Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesOptSwitch));
+            Console.WriteLine(LocaleManager.T(TextKey.MenuOptBackToMain));
+            Console.Write(LocaleManager.T(TextKey.ManageProfilesChoicePrompt));
+
+            string choice = Console.ReadLine()?.Trim().ToUpperInvariant() ?? "";
+
+            switch (choice)
+            {
+                case "0":
+                    return false;
+
+                case "R":
+                    if (profiles.Count == 0)
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesNoProfiles));
+                        break;
+                    }
+
+                    Console.Write(LocaleManager.T(TextKey.ManageProfilesRemoveChoicePrompt));
+                    string removeInput = Console.ReadLine()?.Trim() ?? "";
+
+                    if (!int.TryParse(removeInput, out int removeIndex) || removeIndex < 1 || removeIndex > profiles.Count)
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.InvalidSelection));
+                        break;
+                    }
+
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write(LocaleManager.T(TextKey.ManageProfilesRemoveConfirm));
+                    Console.ResetColor();
+                    string removeConfirm = Console.ReadLine()?.Trim().ToLower() ?? "";
+
+                    if (removeConfirm != "y")
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.OperationCancelled));
+                        break;
+                    }
+
+                    var target = profiles[removeIndex - 1];
+                    profiles.RemoveAt(removeIndex - 1);
+                    SessionConfig.SaveProfiles(profiles);
+
+                    try
+                    {
+                        string sessionPath = SessionConfig.GetSessionPath(target.SessionName);
+                        if (System.IO.File.Exists(sessionPath))
+                            System.IO.File.Delete(sessionPath);
+                    }
+                    catch { /* best-effort cleanup, missing/locked session file is not fatal */ }
+
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesRemoved));
+                    Console.ResetColor();
+                    break;
+
+                case "S":
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write(LocaleManager.T(TextKey.ManageProfilesSwitchConfirm));
+                    Console.ResetColor();
+                    string switchConfirm = Console.ReadLine()?.Trim().ToLower() ?? "";
+
+                    if (switchConfirm == "y")
+                        return true;
+
+                    Console.WriteLine(LocaleManager.T(TextKey.OperationCancelled));
+                    break;
+
+                default:
+                    Console.WriteLine(LocaleManager.T(TextKey.InvalidSelection));
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Prompts the user to pick a saved profile, or add a new account. Called from
+    /// Program.cs before the Client is constructed. Returns null if the user chose
+    /// to add a new account (caller should proceed with a fresh login flow).
+    /// </summary>
+    public static UserProfile? PromptProfilePicker(List<UserProfile> profiles)
+    {
+        while (true)
+        {
+            Console.WriteLine(LocaleManager.T(TextKey.ProfilePickerTitle));
+
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                string label = string.IsNullOrWhiteSpace(profiles[i].DisplayName)
+                    ? profiles[i].PhoneNumber
+                    : profiles[i].DisplayName;
+                Console.WriteLine(LocaleManager.T(TextKey.ProfilePickerEntry, i + 1, label, profiles[i].PhoneNumber));
+            }
+
+            Console.WriteLine(LocaleManager.T(TextKey.ProfilePickerAddNew, profiles.Count + 1));
+            Console.Write(LocaleManager.T(TextKey.ProfilePickerChoicePrompt));
+
+            string input = Console.ReadLine()?.Trim() ?? "";
+
+            if (!int.TryParse(input, out int choice) || choice < 1 || choice > profiles.Count + 1)
+            {
+                Console.WriteLine(LocaleManager.T(TextKey.ProfilePickerInvalid));
+                continue;
+            }
+
+            if (choice == profiles.Count + 1)
+                return null; // "Add new account"
+
+            return profiles[choice - 1];
         }
     }
 
