@@ -1,6 +1,7 @@
 # Build results & Compiler Artifacts
 [Bb]in/
 [Oo]bj/
+publish/
 *.deps.json
 *.runtimeconfig.json
 *.json
