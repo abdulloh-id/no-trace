@@ -16,3 +16,4 @@ publish/
 .idea/
 *.user
 *.suo
+*.ps1
