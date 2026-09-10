@@ -16,7 +16,9 @@ try
     {
         if (lvl >= 3)
         {
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"\n[Telegram API Warning] {str}");
+            Console.ResetColor();
         }
     };
 
@@ -73,7 +75,7 @@ try
             "phone_number" => selectedProfile?.PhoneNumber ?? PromptPhoneNumber(),
             "session_pathname" => SessionConfig.GetSessionPath(sessionName),
             "verification_code" => PromptVerificationCode(),
-            "password" => PromptPassword(), // used transiently only, never persisted
+            "2fa_password" or "2fa" or "password" => PromptPassword(),
             _ => null
         };
 
@@ -124,8 +126,6 @@ static string ResolveApiId(AppSettings settings)
     if (EmbeddedCredentials.IsAvailable)
         return EmbeddedCredentials.ApiId;
 
-    // Self-built/cloned binary with no embedded credentials and no custom
-    // override set yet — fall back to the .env flow for backward compatibility.
     return EnvManager.ConfigProvider("api_id") ?? "";
 }
 
@@ -154,6 +154,5 @@ static string PromptVerificationCode()
 
 static string PromptPassword()
 {
-    Console.Write("Enter secondary account security token (2FA): ");
-    return Console.ReadLine() ?? "";
+    return EnvManager.ConfigProvider("password");
 }

@@ -192,8 +192,14 @@ public class TurboCleanupService : ICleanupService
                 else
                 {
                     await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: false, revoke: true);
-                    if (target is User uBlock) await _client.Contacts_Block(uBlock);
-                    else if (target is ChatBase smallGroup) await _client.Messages_DeleteChatUser(smallGroup.ID, _client.User);
+                    if (target is User u)
+                    {
+                        await _client.Contacts_DeleteContacts(new InputUserBase[] { u });
+                    }
+                    else if (target is ChatBase smallGroup)
+                    {
+                        await _client.Messages_DeleteChatUser(smallGroup.ID, _client.User);
+                    }
                 }
                 break;
 
