@@ -107,7 +107,7 @@ public class TurboCleanupService : ICleanupService
                 {
                     // myMessageIds from GetHistory are naturally newest-first, so Take(X) works perfectly here
                     targetedIds = myMessageIds.Take(surgicalLimit.Value).ToArray();
-                    Console.WriteLine($"[Scoped] Truncated main channel target index to last {targetedIds.Length} active units.");
+                    Console.WriteLine(LocaleManager.T(TextKey.LogTruncatedMainChannel, targetedIds.Length));
                 }
 
                 await DeleteMyFootprintAsync(inputTarget, targetedIds);
@@ -125,7 +125,7 @@ public class TurboCleanupService : ICleanupService
                             if (dialogs.chats.TryGetValue(cf.linked_chat_id, out var linkedChat) && linkedChat is Channel linkedChannelObj)
                             {
                                 var linkedPeer = linkedChat.ToInputPeer();
-                                Console.WriteLine($"[Surgical] Scanning linked discussion group: {linkedChat.Title}...");
+                                Console.WriteLine(LocaleManager.T(TextKey.LogScanningLinkedGroup, linkedChat.Title));
 
                                 int searchOffset = 0;
                                 List<Message> linkedMessagesList = new List<Message>();
@@ -143,7 +143,7 @@ public class TurboCleanupService : ICleanupService
                                     if (searchOffset == 0 || ms.Messages.Length < 100) break;
                                 }
 
-                                // CRITICAL FIX: Order by ID descending to ensure the NEWEST messages are at the top, then apply Take()
+                                // Order by ID descending to ensure NEWEST messages are taken first
                                 int[] linkedTargetedIds = linkedMessagesList
                                     .OrderByDescending(m => m.id)
                                     .Select(m => m.id)
@@ -152,18 +152,17 @@ public class TurboCleanupService : ICleanupService
                                 if (surgicalLimit.HasValue)
                                 {
                                     linkedTargetedIds = linkedTargetedIds.Take(surgicalLimit.Value).ToArray();
-                                    Console.WriteLine($"[Scoped] Truncated linked group target index to last {linkedTargetedIds.Length} active units.");
+                                    Console.WriteLine(LocaleManager.T(TextKey.LogTruncatedLinkedGroup, linkedTargetedIds.Length));
                                 }
 
                                 if (linkedTargetedIds.Length > 0)
                                 {
-                                    // WTelegram uses Channels_DeleteMessages for channels/supergroups
                                     await _client.Channels_DeleteMessages(linkedChannelObj, linkedTargetedIds);
-                                    WriteSuccess($"[SUCCESS] Deleted {linkedTargetedIds.Length} messages from linked group '{linkedChat.Title}'.");
+                                    WriteSuccess(LocaleManager.T(TextKey.LogDeletedLinkedSuccess, linkedTargetedIds.Length, linkedChat.Title));
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[Note] No personal messages found in linked group '{linkedChat.Title}'.");
+                                    Console.WriteLine(LocaleManager.T(TextKey.LogNoLinkedMessagesFound, linkedChat.Title));
                                 }
                             }
                         }
@@ -171,35 +170,72 @@ public class TurboCleanupService : ICleanupService
                     catch (UserCanceledException) { throw; }
                     catch (RpcException rpcEx) when (rpcEx.Code == 400 || rpcEx.Message.Contains("USER_NOT_PARTICIPANT"))
                     {
-                        Console.WriteLine("[Note] Linked group surgical scan skipped: You are not a participant.");
+                        Console.WriteLine(LocaleManager.T(TextKey.LogLinkedScanParticipantSkipped));
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[Minor] Linked group surgical cleanup bypassed: {ex.Message}");
+                        Console.WriteLine(LocaleManager.T(TextKey.LogLinkedCleanupBypassed, ex.Message));
                     }
                 }
                 break;
 
             case "2":
-                await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: true, revoke: true);
+                try
+                {
+                    await _client.Messages_DeleteHistory(inputTarget, max_id: int.MaxValue, just_clear: true, revoke: true);
+                }
+                catch (UserCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(LocaleManager.T(TextKey.LogCleanSlateError, ex.Message));
+                }
                 break;
 
             case "3":
-                if (target is Channel supergroupOrChannel)
+                try
                 {
-                    await _client.Channels_LeaveChannel(supergroupOrChannel);
-                }
-                else
-                {
-                    await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: false, revoke: true);
-                    if (target is User u)
+                    // 1. Surgical: Explicitly delete personal messages first
+                    if (myMessageIds != null && myMessageIds.Length > 0)
                     {
+                        Console.WriteLine(LocaleManager.T(TextKey.LogDeletingPersonalMessages));
+                        await DeleteMyFootprintAsync(inputTarget, myMessageIds);
+
+                        await Task.Delay(1000);
+                    }
+
+                    // 2. Handle specific chat types to Leave and Clear UI History
+                    if (target is Channel supergroupOrChannel)
+                    {
+                        await _client.Channels_LeaveChannel(supergroupOrChannel);
+                    }
+                    else if (target is User u)
+                    {
+                        await _client.Messages_DeleteHistory(inputTarget, max_id: int.MaxValue, just_clear: false, revoke: true);
                         await _client.Contacts_DeleteContacts(new InputUserBase[] { u });
                     }
                     else if (target is ChatBase smallGroup)
                     {
                         await _client.Messages_DeleteChatUser(smallGroup.ID, _client.User);
+
+                        try
+                        {
+                            await _client.Messages_DeleteHistory(inputTarget, max_id: int.MaxValue, just_clear: false, revoke: false);
+                        }
+                        catch { /* Ignore leftover errors if chat is already gone */ }
                     }
+                    else
+                    {
+                        await _client.Messages_DeleteHistory(inputTarget, max_id: int.MaxValue, just_clear: false, revoke: true);
+                    }
+                }
+                catch (UserCanceledException) { throw; }
+                catch (RpcException rpcEx)
+                {
+                    Console.WriteLine(LocaleManager.T(TextKey.LogTelegramApiError, rpcEx.Message));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(LocaleManager.T(TextKey.LogUnlinkError, ex.Message));
                 }
                 break;
 
@@ -215,7 +251,6 @@ public class TurboCleanupService : ICleanupService
                             var linkedPeer = linkedChat.ToInputPeer();
                             Console.WriteLine(LocaleManager.T(TextKey.LogDeepCleaningLinked, linkedChat.Title));
 
-                            // SAFE WRAPPER FOR LINKED CHAT OPERATIONS
                             try
                             {
                                 int searchOffset = 0;
@@ -235,56 +270,19 @@ public class TurboCleanupService : ICleanupService
                                     if (searchOffset == 0 || ms.Messages.Length < 100) break;
                                 }
 
-                                // Attempt to leave, swallowing the participant error gracefully if not in group
                                 await _client.Channels_LeaveChannel(linkedChannelObj);
                             }
                             catch (UserCanceledException) { throw; }
                             catch (RpcException rpcEx) when (rpcEx.Code == 400 || rpcEx.Message.Contains("USER_NOT_PARTICIPANT"))
                             {
-                                Console.WriteLine($"[Note] Linked group leave skipped: You are not a participant of '{linkedChat.Title}'.");
+                                Console.WriteLine(LocaleManager.T(TextKey.LogLinkedLeaveParticipantSkipped, linkedChat.Title));
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"[Minor] Linked group cleanup bypassed: {ex.Message}");
+                                Console.WriteLine(LocaleManager.T(TextKey.LogLinkedCleanupBypassed, ex.Message));
                             }
                         }
                     }
-
-                    // Proceed to wipe the footprint inside the main channel and exit it
-                    await DeleteMyFootprintAsync(channel.ToInputPeer(), myMessageIds);
-                    await Task.Delay(1000);
-
-                    try
-                    {
-                        await _client.Channels_LeaveChannel(channel);
-                    }
-                    catch (RpcException rpcEx) when (rpcEx.Code == 400 || rpcEx.Message.Contains("USER_NOT_PARTICIPANT"))
-                    {
-                        Console.WriteLine($"[Note] Main channel leave skipped: You are already not a participant.");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[Minor] Main channel leave skipped: {ex.Message}");
-                    }
-                }
-                else // Level 4 logic for 1:1 Chats (Users/Bots)
-                {
-                    Console.WriteLine(LocaleManager.T(TextKey.LogExecutingForensic));
-
-                    try
-                    {
-                        await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: false, revoke: true);
-                    }
-                    finally
-                    {
-                        if (target is User u)
-                        {
-                            await _client.Contacts_Block(u);
-                            await _client.Contacts_DeleteContacts(new InputUserBase[] { u });
-                        }
-                    }
-
-                    WriteSuccess(LocaleManager.T(TextKey.LogForensicWipeSuccess));
                 }
                 break;
         }
