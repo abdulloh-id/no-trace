@@ -139,6 +139,9 @@ public enum TextKey
     LogTruncatedLinkedGroup,
     LogDeletedLinkedSuccess,
     LogForensicWipeSuccess,
+    LogCleanSlateSuccess,
+    LogDeletingDirectChat,
+    LogDirectChatDeleted,
 
     // Active Chat Errors, Notes & Swallowed RpcExceptions
     LogNoLinkedMessagesFound,
@@ -333,6 +336,9 @@ public static class LocaleManager
             [TextKey.LogTruncatedLinkedGroup] = "[Scoped] Truncated linked group target index to last {0} active units.",
             [TextKey.LogDeletedLinkedSuccess] = "[SUCCESS] Deleted {0} messages from linked group '{1}'.",
             [TextKey.LogForensicWipeSuccess] = "[SUCCESS] Forensic Wipe: History and Contact link destroyed.",
+            [TextKey.LogCleanSlateSuccess] = "[SUCCESS] Clean Slate wipe completed.",
+            [TextKey.LogDeletingDirectChat] = "[Progress] Deleting direct chat history...",
+            [TextKey.LogDirectChatDeleted] = "[SUCCESS] Direct chat history wiped and contact removed.",
 
             [TextKey.LogNoLinkedMessagesFound] = "[Note] No personal messages found in linked group '{0}'.",
             [TextKey.LogLinkedScanParticipantSkipped] = "[Note] Linked group surgical scan skipped: You are not a participant.",
@@ -485,6 +491,9 @@ public static class LocaleManager
             [TextKey.LogTruncatedLinkedGroup] = "[Ko‘lam] Bog‘langan guruh nishon ko‘lami oxirgi {0} ta xabargacha qisqartirildi.",
             [TextKey.LogDeletedLinkedSuccess] = "[MUVAFFAQIYAT] '{1}' bog‘langan guruhidan {0} ta xabar muvaffaqiyatli o‘chirildi.",
             [TextKey.LogForensicWipeSuccess] = "[MUVAFFAQIYAT] Ekspertiza darajasidagi tozalash: Chat tarixi va kontakt tizimi aloqalari yo‘q qilindi.",
+            [TextKey.LogCleanSlateSuccess] = "[MUVAFFAQIYAT] Barcha tarix muvaffaqiyatli tozalandi.",
+            [TextKey.LogDeletingDirectChat] = "[Jarayon] Shaxsiy yozishmalar tarixi o‘chirilmoqda...",
+            [TextKey.LogDirectChatDeleted] = "[MUVAFFAQIYAT] Shaxsiy yozishmalar tarixi tozalandi va kontakt o‘chirildi.",
 
             [TextKey.LogNoLinkedMessagesFound] = "[Eslatma] '{0}' bog‘langan guruhida shaxsiy xabarlar topilmadi.",
             [TextKey.LogLinkedScanParticipantSkipped] = "[Eslatma] Bog‘langan guruh jarayoni o‘tkazib yuborildi: Siz ushbu guruh a'zosi emassiz.",
@@ -636,6 +645,9 @@ public static class LocaleManager
             [TextKey.LogTruncatedLinkedGroup] = "[Масштаб] Диапазон целей связанной группы урезан до последних {0} единиц.",
             [TextKey.LogDeletedLinkedSuccess] = "[УСПЕХ] Удалено {0} сообщений из связанной группы '{1}'.",
             [TextKey.LogForensicWipeSuccess] = "[УСПЕХ] Судебная очистка: История переписки и связи аккаунта уничтожены.",
+            [TextKey.LogCleanSlateSuccess] = "[УСПЕХ] Вся история успешно очищена.",
+            [TextKey.LogDeletingDirectChat] = "[Прогресс] Удаление истории личного чата...",
+            [TextKey.LogDirectChatDeleted] = "[УСПЕХ] История личного чата очищена, контакт удален.",
 
             [TextKey.LogNoLinkedMessagesFound] = "[Заметка] Личных сообщений в связанной группе '{0}' не найдено.",
             [TextKey.LogLinkedScanParticipantSkipped] = "[Заметка] Сканирование связанной группы пропущено: Вы не являетесь её участником.",

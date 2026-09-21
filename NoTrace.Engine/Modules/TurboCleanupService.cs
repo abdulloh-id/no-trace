@@ -105,7 +105,6 @@ public class TurboCleanupService : ICleanupService
                 int[] targetedIds = myMessageIds;
                 if (surgicalLimit.HasValue)
                 {
-                    // myMessageIds from GetHistory are naturally newest-first, so Take(X) works perfectly here
                     targetedIds = myMessageIds.Take(surgicalLimit.Value).ToArray();
                     Console.WriteLine(LocaleManager.T(TextKey.LogTruncatedMainChannel, targetedIds.Length));
                 }
@@ -130,7 +129,6 @@ public class TurboCleanupService : ICleanupService
                                 int searchOffset = 0;
                                 List<Message> linkedMessagesList = new List<Message>();
 
-                                // Collect the matching message objects so we can look at their IDs and metadata
                                 while (true)
                                 {
                                     var searchResults = await _client.Messages_Search(linkedPeer, "", from_id: _client.User, offset_id: searchOffset, limit: 100);
@@ -143,7 +141,6 @@ public class TurboCleanupService : ICleanupService
                                     if (searchOffset == 0 || ms.Messages.Length < 100) break;
                                 }
 
-                                // Order by ID descending to ensure NEWEST messages are taken first
                                 int[] linkedTargetedIds = linkedMessagesList
                                     .OrderByDescending(m => m.id)
                                     .Select(m => m.id)
@@ -189,6 +186,8 @@ public class TurboCleanupService : ICleanupService
                         if (result.offset > 0)
                             await Task.Delay(300);
                     } while (result.offset > 0);
+
+                    Console.WriteLine(LocaleManager.T(TextKey.OperationComplete));
                 }
                 catch (UserCanceledException) { throw; }
                 catch (Exception ex)
@@ -207,7 +206,7 @@ public class TurboCleanupService : ICleanupService
                         {
                             result = await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: false, revoke: true);
                             if (result.offset > 0)
-                                await Task.Delay(300); // breather to avoid flooding
+                                await Task.Delay(300);
                         } while (result.offset > 0);
 
                         try
@@ -215,6 +214,9 @@ public class TurboCleanupService : ICleanupService
                             await _client.Contacts_DeleteContacts(new InputUserBase[] { u });
                         }
                         catch { /* Ignore if user was not in contacts */ }
+
+                        // Using existing TextKey.LogForensicWipeSuccess from Localization_2.cs
+                        Console.WriteLine(LocaleManager.T(TextKey.LogForensicWipeSuccess));
                     }
                     else
                     {
@@ -257,6 +259,7 @@ public class TurboCleanupService : ICleanupService
                                     if (foundIds.Length > 0)
                                     {
                                         await _client.Channels_DeleteMessages(linkedChannelObj, foundIds);
+                                        WriteSuccess(LocaleManager.T(TextKey.LogDeletedLinkedSuccess, foundIds.Length, linkedChat.Title));
                                         await Task.Delay(2000);
                                     }
                                     searchOffset = messagesFound.LastOrDefault()?.id ?? 0;
