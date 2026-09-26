@@ -239,6 +239,7 @@ public class MenuController
                 }
             }
 
+            Console.WriteLine(new string('-', 30));
             Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesOptRemove));
             Console.WriteLine(LocaleManager.T(TextKey.ManageProfilesOptSwitch));
             Console.WriteLine(LocaleManager.T(TextKey.MenuOptBackToMain));
