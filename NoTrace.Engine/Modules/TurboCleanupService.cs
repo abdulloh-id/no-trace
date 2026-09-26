@@ -235,7 +235,41 @@ public class TurboCleanupService : ICleanupService
                 break;
 
             case "4":
-                if (target is Channel channel)
+                if (target is User u4)
+                {
+                    try
+                    {
+                        Messages_AffectedHistory blResult;
+                        do
+                        {
+                            blResult = await _client.Messages_DeleteHistory(inputTarget, max_id: 0, just_clear: false, revoke: true);
+                            if (blResult.offset > 0)
+                                await Task.Delay(300);
+                        } while (blResult.offset > 0);
+
+                        // The actual block call — this was missing entirely, which is why
+                        // bots/users were never blocked even though level 4 reported success.
+                        await _client.Contacts_Block(u4);
+
+                        try
+                        {
+                            await _client.Contacts_DeleteContacts(new InputUserBase[] { u4 });
+                        }
+                        catch { /* Ignore if user/bot was never in contacts */ }
+
+                        WriteSuccess(LocaleManager.T(TextKey.LogBlacklistSuccess));
+                    }
+                    catch (UserCanceledException) { throw; }
+                    catch (RpcException rpcEx)
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.LogTelegramApiError, rpcEx.Message));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.LogUnlinkError, ex.Message));
+                    }
+                }
+                else if (target is Channel channel)
                 {
                     var dialogs = await _client.Messages_GetAllDialogs();
                     var fullChannel = await _client.Channels_GetFullChannel(channel);
