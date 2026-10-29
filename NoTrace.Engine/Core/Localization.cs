@@ -275,7 +275,7 @@ public static class LocaleManager
             [TextKey.ManageProfilesSwitchConfirm] = "\n[!] This will return you to the account picker. Proceed? (y/n): ",
 
             [TextKey.FetchingActiveChats] = "\nFetching active conversation indices...",
-            [TextKey.SearchPrompt] = "Search for a chat/bot name (type '0' to go back to Main Menu): ",
+            [TextKey.SearchPrompt] = "Search for a chat/bot by name or @username (type '0' to go back to Main Menu): ",
             [TextKey.NoMatchesFound] = "No matches found.",
             [TextKey.MatchingResultsHeader] = "\nFound {0} matching results:\n------------------------------------------",
             [TextKey.EnterIndexPrompt] = "\nEnter the [Index] to clean (or type '0' to search again): ",
@@ -432,7 +432,7 @@ public static class LocaleManager
             [TextKey.ManageProfilesSwitchConfirm] = "\n[!] Bu sizni hisob tanlash menyusiga qaytaradi. Davom etasizmi? (y/n): ",
 
             [TextKey.FetchingActiveChats] = "\nFaol suhbatlar indekslari yuklanmoqda...",
-            [TextKey.SearchPrompt] = "Suhbat yoki bot nomini kiriting (Asosiy menyuga qaytish uchun '0'): ",
+            [TextKey.SearchPrompt] = "Suhbat yoki bot nomini yoki @username'ini kiriting (Asosiy menyuga qaytish uchun '0'): ",
             [TextKey.NoMatchesFound] = "Hech qanday moslik topilmadi.",
             [TextKey.MatchingResultsHeader] = "\n{0} ta mos keladigan natija topildi:\n------------------------------------------",
             [TextKey.EnterIndexPrompt] = "\nTozalanadigan [Indeks]ni kiriting (yoki qayta qidirish uchun '0'): ",
@@ -588,7 +588,7 @@ public static class LocaleManager
             [TextKey.ManageProfilesSwitchConfirm] = "\n[!] Это вернёт вас к выбору аккаунта. Продолжить? (y/n): ",
 
             [TextKey.FetchingActiveChats] = "\nПолучение индексов активных диалогов...",
-            [TextKey.SearchPrompt] = "Введите имя чата/бота (или '0' для возврата в Главное Меню): ",
+            [TextKey.SearchPrompt] = "Введите имя или @username чата/бота (или '0' для возврата в Главное Меню): ",
             [TextKey.NoMatchesFound] = "Совпадений не найдено.",
             [TextKey.MatchingResultsHeader] = "\nНайдено {0} совпадающих результатов:\n------------------------------------------",
             [TextKey.EnterIndexPrompt] = "\nВведите [Индекс] для очистки (или '0' для повторного поиска): ",

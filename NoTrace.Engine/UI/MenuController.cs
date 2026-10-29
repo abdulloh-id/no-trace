@@ -375,15 +375,19 @@ public class MenuController
             Console.WriteLine("\n==========================================");
 
             Console.Write(LocaleManager.T(TextKey.SearchPrompt));
-            string searchTerm = Console.ReadLine()?.ToLower() ?? "";
+            string searchTerm = Console.ReadLine()?.Trim().ToLower() ?? "";
 
             if (searchTerm == "0")
                 break;
 
+            // Allow searching "@username" as well as plain "username"
+            string usernameTerm = searchTerm.TrimStart('@');
+
             var filteredTargets = allTargets.Where(t =>
             {
                 string title = t is ChatBase cb ? cb.Title : (t is User u2 ? $"{u2.first_name} {u2.last_name}" : LocaleManager.T(TextKey.FallbackUnknown));
-                return title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase);
+                return title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                    || (usernameTerm.Length > 0 && GetUsernames(t).Any(name => name.Contains(usernameTerm, StringComparison.OrdinalIgnoreCase)));
             }).ToList();
 
             if (filteredTargets.Count == 0)
@@ -404,7 +408,11 @@ public class MenuController
 
                 string title = peer is ChatBase cb
                     ? cb.Title
-                    : (peer is User u3 ? $"{u3.first_name} {u3.last_name} (@{u3.username})" : LocaleManager.T(TextKey.FallbackUnknown));
+                    : (peer is User u3 ? $"{u3.first_name} {u3.last_name}".Trim() : LocaleManager.T(TextKey.FallbackUnknown));
+
+                string? mainUsername = GetUsernames(peer).FirstOrDefault();
+                if (!string.IsNullOrEmpty(mainUsername))
+                    title += $" (@{mainUsername})";
 
                 Console.WriteLine($"[{i + 1}] {typePrefix,-14}{LocaleManager.T(TextKey.LabelTitleHeader)}{title}");
             }
@@ -504,6 +512,27 @@ public class MenuController
 
             await Task.Delay(1500);
         }
+    }
+
+    /// <summary>
+    /// Returns every public @username of a user, bot, group or channel (main one first), without the '@'.
+    /// Telegram allows multiple (collectible) usernames, so the extra ones are included too.
+    /// </summary>
+    private static IEnumerable<string> GetUsernames(IPeerInfo peer)
+    {
+        var (main, extra) = peer switch
+        {
+            User u => (u.username, u.usernames),
+            Channel c => (c.username, c.usernames),
+            _ => (null, null)
+        };
+
+        var names = new List<string>();
+        if (!string.IsNullOrEmpty(main))
+            names.Add(main);
+        if (extra != null)
+            names.AddRange(extra.Select(x => x.username).Where(n => !string.IsNullOrEmpty(n) && !names.Contains(n)));
+        return names;
     }
 
     private async Task HandleBlocklistManagerAsync()
