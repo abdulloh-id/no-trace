@@ -218,9 +218,9 @@ public class TurboCleanupService : ICleanupService
                         // Using existing TextKey.LogForensicWipeSuccess from Localization_2.cs
                         Console.WriteLine(LocaleManager.T(TextKey.LogForensicWipeSuccess));
                     }
-                    else
+                    else if (target is ChatBase groupOrChannel)
                     {
-                        // ... groups/channels branch unchanged ...
+                        await LeaveGroupOrChannelAsync(groupOrChannel, myMessageIds);
                     }
                 }
                 catch (UserCanceledException) { throw; }
@@ -269,52 +269,117 @@ public class TurboCleanupService : ICleanupService
                         Console.WriteLine(LocaleManager.T(TextKey.LogUnlinkError, ex.Message));
                     }
                 }
-                else if (target is Channel channel)
+                else if (target is ChatBase groupOrChannel)
                 {
-                    var dialogs = await _client.Messages_GetAllDialogs();
-                    var fullChannel = await _client.Channels_GetFullChannel(channel);
-                    if (fullChannel.full_chat is ChannelFull cf && cf.linked_chat_id != 0)
+                    try
                     {
-                        if (dialogs.chats.TryGetValue(cf.linked_chat_id, out var linkedChat) && linkedChat is Channel linkedChannelObj)
-                        {
-                            var linkedPeer = linkedChat.ToInputPeer();
-                            Console.WriteLine(LocaleManager.T(TextKey.LogDeepCleaningLinked, linkedChat.Title));
+                        // Deep-clean and leave the linked discussion group first (channels only)
+                        if (groupOrChannel is Channel channel)
+                            await DeepCleanLinkedGroupAsync(channel);
 
-                            try
-                            {
-                                int searchOffset = 0;
-                                while (true)
-                                {
-                                    var searchResults = await _client.Messages_Search(linkedPeer, "", from_id: _client.User, offset_id: searchOffset, limit: 100);
-                                    if (searchResults is not Messages_MessagesBase ms || ms.Messages.Length == 0) break;
-
-                                    var messagesFound = ms.Messages.OfType<Message>().ToList();
-                                    var foundIds = messagesFound.Select(m => m.id).ToArray();
-                                    if (foundIds.Length > 0)
-                                    {
-                                        await _client.Channels_DeleteMessages(linkedChannelObj, foundIds);
-                                        WriteSuccess(LocaleManager.T(TextKey.LogDeletedLinkedSuccess, foundIds.Length, linkedChat.Title));
-                                        await Task.Delay(2000);
-                                    }
-                                    searchOffset = messagesFound.LastOrDefault()?.id ?? 0;
-                                    if (searchOffset == 0 || ms.Messages.Length < 100) break;
-                                }
-
-                                await _client.Channels_LeaveChannel(linkedChannelObj);
-                            }
-                            catch (UserCanceledException) { throw; }
-                            catch (RpcException rpcEx) when (rpcEx.Code == 400 || rpcEx.Message.Contains("USER_NOT_PARTICIPANT"))
-                            {
-                                Console.WriteLine(LocaleManager.T(TextKey.LogLinkedLeaveParticipantSkipped, linkedChat.Title));
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine(LocaleManager.T(TextKey.LogLinkedCleanupBypassed, ex.Message));
-                            }
-                        }
+                        // Then wipe the footprint in the main chat itself and exit it
+                        await LeaveGroupOrChannelAsync(groupOrChannel, myMessageIds);
+                    }
+                    catch (UserCanceledException) { throw; }
+                    catch (RpcException rpcEx)
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.LogTelegramApiError, rpcEx.Message));
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(LocaleManager.T(TextKey.LogUnlinkError, ex.Message));
                     }
                 }
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Deletes the user's messages in a group/channel and leaves it.
+    /// Routes between supergroups/channels and legacy basic groups.
+    /// </summary>
+    private async Task LeaveGroupOrChannelAsync(ChatBase chat, int[] myMessageIds)
+    {
+        if (myMessageIds != null && myMessageIds.Length > 0)
+        {
+            Console.WriteLine(LocaleManager.T(TextKey.LogDeletingPersonalMessages));
+            await DeleteMyFootprintAsync(chat.ToInputPeer(), myMessageIds);
+            await Task.Delay(1000);
+        }
+
+        try
+        {
+            if (chat is Channel channel)
+            {
+                // Supergroups and broadcast channels
+                await _client.Channels_LeaveChannel(channel);
+            }
+            else
+            {
+                // Legacy basic groups: remove self, then drop the dialog from the chat list
+                await _client.Messages_DeleteChatUser(chat.ID, _client.User);
+
+                try
+                {
+                    await _client.Messages_DeleteHistory(chat.ToInputPeer(), max_id: 0, just_clear: false, revoke: false);
+                }
+                catch { /* Ignore leftover errors if chat is already gone */ }
+            }
+
+            WriteSuccess(LocaleManager.T(TextKey.LogLeftChatSuccess, chat.Title));
+        }
+        catch (RpcException rpcEx) when (rpcEx.Message.Contains("USER_NOT_PARTICIPANT") || rpcEx.Message.Contains("CHANNEL_PRIVATE"))
+        {
+            Console.WriteLine(LocaleManager.T(TextKey.LogMainLeaveSkipped));
+        }
+    }
+
+    /// <summary>
+    /// Level 4 helper: deletes all of the user's messages in a channel's linked discussion group and leaves it.
+    /// </summary>
+    private async Task DeepCleanLinkedGroupAsync(Channel channel)
+    {
+        var dialogs = await _client.Messages_GetAllDialogs();
+        var fullChannel = await _client.Channels_GetFullChannel(channel);
+        if (fullChannel.full_chat is ChannelFull cf && cf.linked_chat_id != 0)
+        {
+            if (dialogs.chats.TryGetValue(cf.linked_chat_id, out var linkedChat) && linkedChat is Channel linkedChannelObj)
+            {
+                var linkedPeer = linkedChat.ToInputPeer();
+                Console.WriteLine(LocaleManager.T(TextKey.LogDeepCleaningLinked, linkedChat.Title));
+
+                try
+                {
+                    int searchOffset = 0;
+                    while (true)
+                    {
+                        var searchResults = await _client.Messages_Search(linkedPeer, "", from_id: _client.User, offset_id: searchOffset, limit: 100);
+                        if (searchResults is not Messages_MessagesBase ms || ms.Messages.Length == 0) break;
+
+                        var messagesFound = ms.Messages.OfType<Message>().ToList();
+                        var foundIds = messagesFound.Select(m => m.id).ToArray();
+                        if (foundIds.Length > 0)
+                        {
+                            await _client.Channels_DeleteMessages(linkedChannelObj, foundIds);
+                            WriteSuccess(LocaleManager.T(TextKey.LogDeletedLinkedSuccess, foundIds.Length, linkedChat.Title));
+                            await Task.Delay(2000);
+                        }
+                        searchOffset = messagesFound.LastOrDefault()?.id ?? 0;
+                        if (searchOffset == 0 || ms.Messages.Length < 100) break;
+                    }
+
+                    await _client.Channels_LeaveChannel(linkedChannelObj);
+                }
+                catch (UserCanceledException) { throw; }
+                catch (RpcException rpcEx) when (rpcEx.Code == 400 || rpcEx.Message.Contains("USER_NOT_PARTICIPANT"))
+                {
+                    Console.WriteLine(LocaleManager.T(TextKey.LogLinkedLeaveParticipantSkipped, linkedChat.Title));
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(LocaleManager.T(TextKey.LogLinkedCleanupBypassed, ex.Message));
+                }
+            }
         }
     }
 

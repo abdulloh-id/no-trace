@@ -143,6 +143,7 @@ public enum TextKey
     LogCleanSlateSuccess,
     LogDeletingDirectChat,
     LogDirectChatDeleted,
+    LogLeftChatSuccess,
 
     // Active Chat Errors, Notes & Swallowed RpcExceptions
     LogNoLinkedMessagesFound,
@@ -341,6 +342,7 @@ public static class LocaleManager
             [TextKey.LogCleanSlateSuccess] = "[SUCCESS] Clean Slate wipe completed.",
             [TextKey.LogDeletingDirectChat] = "[Progress] Deleting direct chat history...",
             [TextKey.LogDirectChatDeleted] = "[SUCCESS] Direct chat history wiped and contact removed.",
+            [TextKey.LogLeftChatSuccess] = "[SUCCESS] Your messages were deleted and you left '{0}'.",
 
             [TextKey.LogNoLinkedMessagesFound] = "[Note] No personal messages found in linked group '{0}'.",
             [TextKey.LogLinkedScanParticipantSkipped] = "[Note] Linked group surgical scan skipped: You are not a participant.",
@@ -497,6 +499,7 @@ public static class LocaleManager
             [TextKey.LogCleanSlateSuccess] = "[MUVAFFAQIYAT] Barcha tarix muvaffaqiyatli tozalandi.",
             [TextKey.LogDeletingDirectChat] = "[Jarayon] Shaxsiy yozishmalar tarixi o‘chirilmoqda...",
             [TextKey.LogDirectChatDeleted] = "[MUVAFFAQIYAT] Shaxsiy yozishmalar tarixi tozalandi va kontakt o‘chirildi.",
+            [TextKey.LogLeftChatSuccess] = "[MUVAFFAQIYAT] Xabarlaringiz o‘chirildi va siz '{0}'ni tark etdingiz.",
 
             [TextKey.LogNoLinkedMessagesFound] = "[Eslatma] '{0}' bog‘langan guruhida shaxsiy xabarlar topilmadi.",
             [TextKey.LogLinkedScanParticipantSkipped] = "[Eslatma] Bog‘langan guruh jarayoni o‘tkazib yuborildi: Siz ushbu guruh a'zosi emassiz.",
@@ -652,6 +655,7 @@ public static class LocaleManager
             [TextKey.LogCleanSlateSuccess] = "[УСПЕХ] Вся история успешно очищена.",
             [TextKey.LogDeletingDirectChat] = "[Прогресс] Удаление истории личного чата...",
             [TextKey.LogDirectChatDeleted] = "[УСПЕХ] История личного чата очищена, контакт удален.",
+            [TextKey.LogLeftChatSuccess] = "[УСПЕХ] Ваши сообщения удалены, вы покинули '{0}'.",
 
             [TextKey.LogNoLinkedMessagesFound] = "[Заметка] Личных сообщений в связанной группе '{0}' не найдено.",
             [TextKey.LogLinkedScanParticipantSkipped] = "[Заметка] Сканирование связанной группы пропущено: Вы не являетесь её участником.",
